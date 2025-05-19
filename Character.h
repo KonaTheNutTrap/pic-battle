@@ -17,7 +17,7 @@ protected:
     int baseScissorsDamage;
     int bonusDamageNextAttack;
     std::vector<Passive> passives;
-    std::string characterType; // "BUILTIN" or "CUSTOM"
+    std::string characterType;
 
 public:
     Character(const std::string& n, int hp, int rock, int paper, int scissors, std::string type = "BUILTIN");

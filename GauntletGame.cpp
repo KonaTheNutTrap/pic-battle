@@ -1,23 +1,28 @@
 #include "GauntletGame.h"
 #include "CharacterManager.h"
 #include "Utils.h"
-#include "AISystem.h" // For AI
+#include "AISystem.h"
 #include <iostream>
 #include <fstream>
 #include <algorithm>
 #include <random>
-#include <cstdlib> // For system, rand, srand
+#include <cstdlib>
 #include <vector>
-#include <memory> // For make_unique
+#include <memory>
+#include <chrono>
+#include <thread>
 
-using namespace std; // OK in .cpp file
 
-GauntletGame::GauntletGame() : winsInCurrentRun(0) {
+using namespace std; 
+
+GauntletGame::GauntletGame() : winsInCurrentRun(0), lastPlayerMoveInBattle(0), lastBotMoveInBattle(0) {
     loadGauntletUnlocks();
 }
 
-// Simplified clone logic inside selectPlayerForGauntlet and runBattle
-// Character* GauntletGame::cloneCharacter(const Character& prototype) { ... }
+void GauntletGame::resetGauntletBattleHistory() {
+    lastPlayerMoveInBattle = 0;
+    lastBotMoveInBattle = 0;
+}
 
 
 void GauntletGame::loadGauntletUnlocks() {
@@ -35,7 +40,7 @@ void GauntletGame::loadGauntletUnlocks() {
 
     if (find(unlockedGauntletCharacters.begin(), unlockedGauntletCharacters.end(), "OG") == unlockedGauntletCharacters.end()) {
         unlockedGauntletCharacters.push_back("OG");
-        saveGauntletUnlocks(); // Save if OG was added (also creates file if non-existent)
+        saveGauntletUnlocks();
     }
     sort(unlockedGauntletCharacters.begin(), unlockedGauntletCharacters.end());
 }
@@ -48,7 +53,6 @@ void GauntletGame::saveGauntletUnlocks() {
             outFile << name << endl;
             if (name == "OG") og_saved = true;
         }
-        // Ensure OG is saved if it was supposed to be there but somehow wasn't iterated
         if (!og_saved && find(unlockedGauntletCharacters.begin(), unlockedGauntletCharacters.end(), "OG") != unlockedGauntletCharacters.end()) {
             outFile << "OG" << endl;
         }
@@ -62,17 +66,16 @@ void GauntletGame::saveGauntletUnlocks() {
 bool GauntletGame::selectPlayerForGauntlet() {
     system("cls");
     cout << "=== Gauntlet Mode - Select Your Fighter ===\n";
-    if (unlockedGauntletCharacters.empty()) { // Should always have OG
+    if (unlockedGauntletCharacters.empty()) {
         cout << "No characters unlocked for Gauntlet Mode. (This shouldn't happen, OG is default).\n";
         cout << "Press Enter to return to menu...";
-        // cin.ignore();
         cin.get();
         return false;
     }
 
     cout << "Available characters:\n";
     vector<Character*> selectablePlayerPrototypes;
-    vector<string> validUnlockedNames; // To map choice back to name
+    vector<string> validUnlockedNames;
 
     for (const string& unlockedName : unlockedGauntletCharacters) {
         bool found = false;
@@ -87,40 +90,32 @@ bool GauntletGame::selectPlayerForGauntlet() {
         }
         if (!found) {
             cout << (selectablePlayerPrototypes.size() + 1) << ". " << unlockedName << " (Error: Data not found, cannot select)" << endl;
-            // Don't add to selectablePlayerPrototypes or validUnlockedNames
         }
     }
 
     if (selectablePlayerPrototypes.empty()) {
         cout << "No valid characters found for selection.\nPress Enter to return...";
-        // cin.ignore();
         cin.get();
         return false;
     }
 
     int choice = getIntInput("Choose your character: ", 1, static_cast<int>(selectablePlayerPrototypes.size()));
-    Character* chosenProto = selectablePlayerPrototypes[choice - 1]; // This is a raw pointer to an object in availableCharacters
+    Character* chosenProto = selectablePlayerPrototypes[choice - 1];
 
-    // Clone the selected character for the gauntlet run
-    // This logic should be robust. If new built-ins are added, they need to be here.
     if (chosenProto->getName() == "OG") playerCharacter = make_unique<OG>();
     else if (chosenProto->getName() == "Helios") playerCharacter = make_unique<Helios>();
     else if (chosenProto->getName() == "Duran") playerCharacter = make_unique<Duran>();
     else if (chosenProto->getName() == "Philip") playerCharacter = make_unique<Philip>();
     else if (chosenProto->getName() == "Razor") playerCharacter = make_unique<Razor>();
     else if (chosenProto->getName() == "Sunny") playerCharacter = make_unique<Sunny>();
-    else { // For custom characters or other non-hardcoded built-ins
-        // This relies on Character's copy constructor.
-        // If chosenProto is a derived type not handled above, it will be sliced to Character.
-        // This is acceptable if custom characters are only of base Character type functionality.
+    else {
         playerCharacter = make_unique<Character>(*chosenProto);
     }
 
-    playerCharacter->resetStatsForNewBattle(); // Full HP and reset bonus damage
+    playerCharacter->resetStatsForNewBattle();
 
     cout << "You chose: " << playerCharacter->getName() << endl;
     cout << "Press Enter to start the Gauntlet...";
-    // cin.ignore();
     cin.get();
     return true;
 }
@@ -134,11 +129,9 @@ void GauntletGame::generateOpponentOrder(vector<Character*>& currentOpponentList
             potentialOpponents.push_back(charPtr.get());
         }
     }
-    // If not enough BUILTIN, consider adding CUSTOM (or allow repeats of BUILTIN)
     if (potentialOpponents.size() < OPPONENTS_TO_BEAT) {
         for (const auto& charPtr : availableCharacters) {
             if (playerCharacter && charPtr->getName() != playerCharacter->getName() && charPtr->getType() == "CUSTOM") {
-                // Check if already added to avoid duplicates if a char is somehow both built-in and custom (should not happen)
                 if (find(potentialOpponents.begin(), potentialOpponents.end(), charPtr.get()) == potentialOpponents.end()) {
                     potentialOpponents.push_back(charPtr.get());
                 }
@@ -146,17 +139,15 @@ void GauntletGame::generateOpponentOrder(vector<Character*>& currentOpponentList
         }
     }
 
-
     if (potentialOpponents.empty()) {
-        // Fallback: if player is the only character or only one other type, use OG or first available non-player
         for (const auto& charPtr : availableCharacters) {
             if (playerCharacter && charPtr->getName() != playerCharacter->getName()) {
                 potentialOpponents.push_back(charPtr.get());
-                if (!potentialOpponents.empty()) break; // Take the first different one
+                if (!potentialOpponents.empty()) break;
             }
         }
-        if (potentialOpponents.empty() && !availableCharacters.empty()) { // If still empty, player is the only char
-            potentialOpponents.push_back(availableCharacters[0].get()); // Fight self (last resort)
+        if (potentialOpponents.empty() && !availableCharacters.empty()) {
+            potentialOpponents.push_back(availableCharacters[0].get());
             cout << "Warning: Not enough distinct opponents. You might fight yourself or clones." << endl;
         }
     }
@@ -171,7 +162,7 @@ void GauntletGame::generateOpponentOrder(vector<Character*>& currentOpponentList
     std::shuffle(potentialOpponents.begin(), potentialOpponents.end(), g);
 
     for (int i = 0; i < OPPONENTS_TO_BEAT; ++i) {
-        if (!potentialOpponents.empty()) { // Ensure we always have someone to pick
+        if (!potentialOpponents.empty()) {
             currentOpponentList.push_back(potentialOpponents[i % potentialOpponents.size()]);
         }
         else {
@@ -210,7 +201,8 @@ int GauntletGame::getRPSWinner(int playerMove, int botMove) const {
 
 bool GauntletGame::runBattle(Character& activePlayer, Character& opponentProto) {
     unique_ptr<Character> currentOpponent;
-    // Clone opponentProto to currentOpponent
+    resetGauntletBattleHistory(); // Reset history for this specific battle
+
     if (opponentProto.getName() == "OG") currentOpponent = make_unique<OG>();
     else if (opponentProto.getName() == "Helios") currentOpponent = make_unique<Helios>();
     else if (opponentProto.getName() == "Duran") currentOpponent = make_unique<Duran>();
@@ -218,9 +210,9 @@ bool GauntletGame::runBattle(Character& activePlayer, Character& opponentProto) 
     else if (opponentProto.getName() == "Razor") currentOpponent = make_unique<Razor>();
     else if (opponentProto.getName() == "Sunny") currentOpponent = make_unique<Sunny>();
     else {
-        currentOpponent = make_unique<Character>(opponentProto); // Copy constructor for customs
+        currentOpponent = make_unique<Character>(opponentProto);
     }
-    currentOpponent->resetStatsForNewBattle(); // Full HP
+    currentOpponent->resetStatsForNewBattle();
 
     cout << "\n--- Battle Start! Player vs " << currentOpponent->getName() << " ---" << endl;
     AIDifficulty gauntletAIDifficulty = AIDifficulty::HARD;
@@ -249,25 +241,25 @@ bool GauntletGame::runBattle(Character& activePlayer, Character& opponentProto) 
         int playerMove = getIntInput("Enter choice (1-3): ", 1, 3);
 
         cout << currentOpponent->getName() << " is thinking..." << endl;
-        int opponentMove = AISystem::chooseMove(*currentOpponent, activePlayer, gauntletAIDifficulty);
-        // std::this_thread::sleep_for(std::chrono::milliseconds(300)); // Optional delay
+        int botMoveCurrent = AISystem::chooseMove(*currentOpponent, activePlayer, gauntletAIDifficulty, lastBotMoveInBattle, lastPlayerMoveInBattle);
+        // std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
         system("cls");
         displayBattleStatus(activePlayer, *currentOpponent);
 
         cout << activePlayer.getName() << " chose: " << getMoveString(playerMove) << "\n";
-        cout << currentOpponent->getName() << " chose: " << getMoveString(opponentMove) << "\n\n";
+        cout << currentOpponent->getName() << " chose: " << getMoveString(botMoveCurrent) << "\n\n";
 
-        int rpsWinner = getRPSWinner(playerMove, opponentMove);
+        int rpsWinner = getRPSWinner(playerMove, botMoveCurrent);
 
-        if (rpsWinner == 0) {
+        if (rpsWinner == 0) { // Tie
             cout << "It's a tie!\n";
             activePlayer.checkAndApplyPassives(PassiveTrigger::ON_TIE, activePlayer, *currentOpponent, 0, false);
             if (currentOpponent->isDefeated() || activePlayer.isDefeated()) break;
             currentOpponent->checkAndApplyPassives(PassiveTrigger::ON_TIE, *currentOpponent, activePlayer, 0, false);
             if (currentOpponent->isDefeated() || activePlayer.isDefeated()) break;
         }
-        else if (rpsWinner == 1) {
+        else if (rpsWinner == 1) { // Player wins
             int damage = activePlayer.calculateDamage(playerMove);
             cout << "You win the round! " << currentOpponent->getName() << " takes " << damage << " damage.\n";
             int oldOpponentHp = currentOpponent->getCurrentHp();
@@ -278,7 +270,7 @@ bool GauntletGame::runBattle(Character& activePlayer, Character& opponentProto) 
             activePlayer.checkAndApplyPassives(PassiveTrigger::AFTER_ANY_ATTACK, activePlayer, *currentOpponent);
             if (currentOpponent->isDefeated() || activePlayer.isDefeated()) break;
 
-            currentOpponent->checkAndApplyPassives(static_cast<PassiveTrigger>(opponentMove + 3), *currentOpponent, activePlayer, opponentMove, false);
+            currentOpponent->checkAndApplyPassives(static_cast<PassiveTrigger>(botMoveCurrent + 3), *currentOpponent, activePlayer, botMoveCurrent, false);
             if (activePlayer.isDefeated() || currentOpponent->isDefeated()) break;
             currentOpponent->checkAndApplyPassives(PassiveTrigger::AFTER_TAKING_HIT, *currentOpponent, activePlayer);
             if (activePlayer.isDefeated() || currentOpponent->isDefeated()) break;
@@ -288,13 +280,13 @@ bool GauntletGame::runBattle(Character& activePlayer, Character& opponentProto) 
                 if (activePlayer.isDefeated() || currentOpponent->isDefeated()) break;
             }
         }
-        else {
-            int damage = currentOpponent->calculateDamage(opponentMove);
+        else { // Opponent wins
+            int damage = currentOpponent->calculateDamage(botMoveCurrent);
             cout << currentOpponent->getName() << " wins the round! You take " << damage << " damage.\n";
             int oldPlayerHp = activePlayer.getCurrentHp();
             activePlayer.takeDamage(damage);
 
-            currentOpponent->checkAndApplyPassives(static_cast<PassiveTrigger>(opponentMove), *currentOpponent, activePlayer, opponentMove, true);
+            currentOpponent->checkAndApplyPassives(static_cast<PassiveTrigger>(botMoveCurrent), *currentOpponent, activePlayer, botMoveCurrent, true);
             if (activePlayer.isDefeated() || currentOpponent->isDefeated()) break;
             currentOpponent->checkAndApplyPassives(PassiveTrigger::AFTER_ANY_ATTACK, *currentOpponent, activePlayer);
             if (activePlayer.isDefeated() || currentOpponent->isDefeated()) break;
@@ -309,9 +301,12 @@ bool GauntletGame::runBattle(Character& activePlayer, Character& opponentProto) 
                 if (currentOpponent->isDefeated() || activePlayer.isDefeated()) break;
             }
         }
+
+        lastPlayerMoveInBattle = playerMove;
+        lastBotMoveInBattle = botMoveCurrent;
+
         if (activePlayer.isDefeated() || currentOpponent->isDefeated()) break;
         cout << "\nPress Enter for next turn...";
-        // cin.ignore();
         cin.get();
     }
     system("cls");
@@ -329,14 +324,13 @@ bool GauntletGame::runBattle(Character& activePlayer, Character& opponentProto) 
 
 
 void GauntletGame::attemptUnlockNextCharacter() {
-    vector<string> unlockOrder = { "OG", "Helios", "Duran", "Philip", "Razor", "Sunny" }; // Canonical order
+    vector<string> unlockOrder = { "OG", "Helios", "Duran", "Philip", "Razor", "Sunny" };
 
-    string lastUnlockedCanonical = "OG"; // Default: OG is always first
+    string lastUnlockedCanonical = "OG";
     for (int i = unlockOrder.size() - 1; i >= 0; --i) {
-        // Check if this canonical character is in our list of unlocked characters
         if (find(unlockedGauntletCharacters.begin(), unlockedGauntletCharacters.end(), unlockOrder[i]) != unlockedGauntletCharacters.end()) {
             lastUnlockedCanonical = unlockOrder[i];
-            break; // Found the latest character in the canonical order that we've unlocked
+            break;
         }
     }
 
@@ -344,7 +338,6 @@ void GauntletGame::attemptUnlockNextCharacter() {
     bool foundLast = false;
     for (const string& charInOrder : unlockOrder) {
         if (foundLast) {
-            // This is the one after lastUnlockedCanonical. Is it already unlocked?
             if (find(unlockedGauntletCharacters.begin(), unlockedGauntletCharacters.end(), charInOrder) == unlockedGauntletCharacters.end()) {
                 nextCharToUnlock = charInOrder;
                 break;
@@ -354,7 +347,6 @@ void GauntletGame::attemptUnlockNextCharacter() {
             foundLast = true;
         }
     }
-
 
     if (!nextCharToUnlock.empty()) {
         bool isValidBuiltIn = false;
@@ -372,7 +364,7 @@ void GauntletGame::attemptUnlockNextCharacter() {
             saveGauntletUnlocks();
             cout << "\nCongratulations! You've unlocked a new character for Gauntlet Mode: " << nextCharToUnlock << "!\n";
         }
-        else if (!nextCharToUnlock.empty()) { // Should not happen if unlockOrder is correct
+        else if (!nextCharToUnlock.empty()) {
             cout << "\nTried to unlock '" << nextCharToUnlock << "' but it's not a recognized built-in character.\n";
         }
     }
@@ -389,29 +381,27 @@ void GauntletGame::play() {
     cout << "Only OG is available initially. Win to unlock more fighters!\n";
 
     loadGauntletUnlocks();
+    resetGauntletBattleHistory(); // Reset overall gauntlet history, individual battle history is reset in runBattle
 
-    if (!playerCharacter) { // Ensure playerCharacter is null before selection or if a previous run failed mid-way
+    if (playerCharacter) { // Clear any lingering player character from a previous run
         playerCharacter.reset();
     }
     if (!selectPlayerForGauntlet()) {
         return;
     }
-    if (!playerCharacter) { // Defensive check
+    if (!playerCharacter) {
         cout << "Player character selection failed unexpectedly. Returning to menu." << endl;
-        // cin.ignore();
         cin.get();
         return;
     }
-
 
     vector<Character*> opponentOrderPrototypes;
     generateOpponentOrder(opponentOrderPrototypes);
 
     if (opponentOrderPrototypes.empty() || opponentOrderPrototypes.size() < OPPONENTS_TO_BEAT) {
-        cout << "Not enough unique opponents to start the Gauntlet (Need at least " << OPPONENTS_TO_BEAT << " distinct types potentially).\n";
+        cout << "Not enough unique opponents to start the Gauntlet (Need at least " << OPPONENTS_TO_BEAT << ").\n";
         cout << "Current available opponents for order: " << opponentOrderPrototypes.size() << endl;
         cout << "Press Enter to return to menu...";
-        // cin.ignore();
         cin.get();
         return;
     }
@@ -435,7 +425,6 @@ void GauntletGame::play() {
             playerCharacter->heal(interRoundHeal);
             cout << "You recovered " << interRoundHeal << " HP between rounds. Current HP: " << playerCharacter->getCurrentHp() << "/" << playerCharacter->getMaxHp() << "\n";
             cout << "Press Enter for the next opponent...";
-            // cin.ignore();
             cin.get();
         }
     }
@@ -451,8 +440,6 @@ void GauntletGame::play() {
     }
 
     cout << "You defeated " << winsInCurrentRun << " opponents.\n";
-    // playerCharacter.reset(); // Reset for next gauntlet run. Done at start of selectPlayerForGauntlet
     cout << "Press Enter to return to the main menu...";
-    // cin.ignore();
     cin.get();
 }

@@ -5,7 +5,7 @@
 #include <sstream>
 #include <utility> // For std::move
 
-using namespace std; // OK in .cpp file
+using namespace std; 
 
 Character::Character(const string& n, int hp, int rock, int paper, int scissors, string type)
     : name(n), maxHp(hp), currentHp(hp), baseRockDamage(rock), basePaperDamage(paper),
@@ -25,7 +25,7 @@ int Character::getCurrentHp() const { return currentHp; }
 int Character::getRockDamage() const { return baseRockDamage; }
 int Character::getPaperDamage() const { return basePaperDamage; }
 int Character::getScissorsDamage() const { return baseScissorsDamage; }
-int Character::getBonusDamageNextAttack() const { return bonusDamageNextAttack; } // Added for AI
+int Character::getBonusDamageNextAttack() const { return bonusDamageNextAttack; } 
 const vector<Passive>& Character::getPassives() const { return passives; }
 string Character::getType() const { return characterType; }
 
