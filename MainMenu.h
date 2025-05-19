@@ -4,6 +4,7 @@
 #include "Game.h" // For Game object member
 // CharacterManager functions like loadCharacters, saveCharacters are called directly
 #include "CharacterManager.h" 
+#include "GauntletGame.h"
 #include <cstdlib> 
 #include <ctime>   
 
@@ -12,6 +13,7 @@ using namespace std;
 class MainMenu {
 private:
     Game game;
+    GauntletGame gauntletGame;
     bool exitGame;
 
     void displayMenu();

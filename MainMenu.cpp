@@ -4,6 +4,7 @@
 #include <iostream>
 #include <cstdlib> 
 #include <ctime>   
+#include "GauntletGame.h"
 
 using namespace std;
 
@@ -19,8 +20,9 @@ void MainMenu::displayMenu() {
     cout << "==================================\n\n";
     cout << "1. Start Battle\n";
     cout << "2. Debug Mode Battle\n";
-    cout << "3. Character Creator\n";
-    cout << "4. Exit\n\n";
+    cout << "3. Gauntlet Mode\n"; // New Option
+    cout << "4. Character Creator\n";
+    cout << "5. Exit\n\n";        // Adjust numbering
     cout << "Enter your choice: ";
 }
 
@@ -53,7 +55,7 @@ void MainMenu::runCreator() {
 void MainMenu::run() {
     while (!exitGame) {
         displayMenu();
-        int choice = getIntInput("", 1, 4);
+        int choice = getIntInput("", 1, 5); 
         switch (choice) {
         case 1:
             game.setDebugMode(false);
@@ -63,13 +65,17 @@ void MainMenu::run() {
             game.setDebugMode(true);
             game.play();
             break;
-        case 3:
+        case 3: 
+            gauntletGame.play();
+            break;
+        case 4: 
             runCreator();
             break;
-        case 4:
+        case 5: 
             exitGame = true;
             cout << "\nSaving characters and exiting...\n";
-            saveCharacters();
+            saveCharacters(); // Ensure custom characters are saved
+            // Gauntlet unlocks are saved by GauntletGame itself.
             cout << "GAME OVER!\n";
             break;
         }

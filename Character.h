@@ -28,6 +28,9 @@ public:
     // Constructor for custom characters (includes passives) or built-ins with passives
     Character(const string& n, int hp, int rock, int paper, int scissors, vector<Passive> p, string type = "CUSTOM");
 
+    // Resets HP to max and other temporary battle stats
+    void resetStatsForNewBattle(); 
+
     virtual ~Character();
 
     // --- Getters ---

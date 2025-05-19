@@ -107,6 +107,8 @@ bool Game::initialize() {
 
     cout << "\nYou chose: " << player->getName() << "\n";
     cout << "Enemy chose: " << bot->getName() << "\n\n";
+    if (player) player->resetStatsForNewBattle(); // Add null check for safety
+    if (bot) bot->resetStatsForNewBattle();     // Add null check for safety
     cout << "Let the battle commence!\n";
     cout << "Press Enter to start...";
     cin.get();
@@ -125,6 +127,8 @@ bool Game::initializeDebug() {
 
     cout << "\nPlayer is: " << player->getName() << "\n";
     cout << "Bot is: " << bot->getName() << "\n\n";
+    if (player) player->resetStatsForNewBattle(); // Add null check for safety
+    if (bot) bot->resetStatsForNewBattle();     // Add null check for safety
     cout << "Let the debug battle commence!\n";
     cout << "Press Enter to start...";
     cin.get();

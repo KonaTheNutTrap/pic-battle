@@ -35,6 +35,12 @@ string Character::getType() const { return characterType; }
 bool Character::isDefeated() const { return currentHp <= 0; }
 
 // --- Actions ---
+
+void Character::resetStatsForNewBattle() {
+    currentHp = maxHp;
+    bonusDamageNextAttack = 0;
+}
+
 void Character::takeDamage(int damage) {
     currentHp -= damage;
     if (currentHp < 0) currentHp = 0;
