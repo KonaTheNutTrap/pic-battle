@@ -1,27 +1,35 @@
 #include "Game.h"
-#include "CharacterManager.h" 
-#include "Utils.h"           
+#include "CharacterManager.h"
+#include "Utils.h"
+#include "AISystem.h" 
 #include <iostream>
-#include <cstdlib>           
-#include <algorithm>          // For potential future use
+#include <cstdlib>
+#include <algorithm>
+#include <chrono> 
+#include <thread> 
 
-using namespace std;
+using namespace std; 
 
-Game::Game() : player(nullptr), bot(nullptr), debugMode(false) {}
+Game::Game() : player(nullptr), bot(nullptr), debugMode(false), currentAIDifficulty(AIDifficulty::HARD) {}
 
-Game::~Game() {} // Raw pointers player/bot point to objects managed by unique_ptr in availableCharacters
+Game::~Game() {}
 
 void Game::setDebugMode(bool debug) {
     debugMode = debug;
 }
 
-int Game::getRandomMove() const {
-    return rand() % 3 + 1; // 1 = Rock, 2 = Paper, 3 = Scissors
+void Game::setAIDifficulty(AIDifficulty difficulty) {
+    currentAIDifficulty = difficulty;
 }
+
+AIDifficulty Game::getAIDifficulty() const {
+    return currentAIDifficulty;
+}
+
 
 void Game::displayHealth() const {
     cout << "\n===== STATUS =====\n";
-    if (player) { // Ensure player is not null
+    if (player) {
         cout << player->getName() << ": " << player->getCurrentHp() << "/" << player->getMaxHp() << " HP\n";
         if (!player->getPassives().empty()) {
             cout << "  Passives:\n";
@@ -33,11 +41,8 @@ void Game::displayHealth() const {
     else {
         cout << "Player not selected.\n";
     }
-
-
     cout << "\n";
-
-    if (bot) { // Ensure bot is not null
+    if (bot) {
         cout << "Bot (" << bot->getName() << "): " << bot->getCurrentHp() << "/" << bot->getMaxHp() << " HP\n";
         if (!bot->getPassives().empty()) {
             cout << "  Passives:\n";
@@ -53,13 +58,13 @@ void Game::displayHealth() const {
 }
 
 int Game::getRPSWinner(int playerMove, int botMove) const {
-    if (playerMove == botMove) return 0; // Tie
+    if (playerMove == botMove) return 0;
     if ((playerMove == 1 && botMove == 3) ||
         (playerMove == 2 && botMove == 1) ||
         (playerMove == 3 && botMove == 2)) {
-        return 1; // Player wins
+        return 1;
     }
-    return 2; // Bot wins
+    return 2;
 }
 
 string Game::getMoveString(int move) const {
@@ -93,22 +98,46 @@ bool Game::initialize() {
     player = selectCharacter("Select your Fighter!");
     if (!player) return false;
 
-    if (availableCharacters.size() <= 1) {
+    if (availableCharacters.size() <= 1 && (availableCharacters.empty() || availableCharacters[0].get() == player)) {
         cout << "Not enough unique characters for the bot to choose! Bot will be the same.\n";
-        bot = player;
+        bot = player; // Or select the first available if player is the only one.
+        if (availableCharacters.empty()) { // Should not happen if player was selected
+            cerr << "Critical Error: No characters available for bot after player selection." << endl; return false;
+        }
+        else if (!bot) { // If player was the only char, bot can be player.
+            bot = availableCharacters[0].get(); // Fallback if bot somehow wasn't set
+        }
+
     }
     else {
-        int botChoiceIndex;
-        do {
-            botChoiceIndex = rand() % availableCharacters.size();
-        } while (availableCharacters[botChoiceIndex].get() == player);
-        bot = availableCharacters[botChoiceIndex].get();
+        vector<Character*> potentialBots;
+        for (const auto& charPtr : availableCharacters) {
+            if (charPtr.get() != player) {
+                potentialBots.push_back(charPtr.get());
+            }
+        }
+        if (potentialBots.empty()) { // Should only happen if only one char exists and it's player
+            cout << "Only one character available. Bot will be the same as player." << endl;
+            bot = player;
+        }
+        else {
+            bot = potentialBots[rand() % potentialBots.size()];
+        }
     }
+    if (!bot) { // Final fallback if bot selection logic failed
+        cerr << "Error: Bot could not be selected." << endl;
+        if (!availableCharacters.empty()) bot = availableCharacters[0].get(); // Try to assign *something*
+        else return false; // No characters at all
+    }
+
 
     cout << "\nYou chose: " << player->getName() << "\n";
     cout << "Enemy chose: " << bot->getName() << "\n\n";
+    if (player) player->resetStatsForNewBattle();
+    if (bot) bot->resetStatsForNewBattle();
     cout << "Let the battle commence!\n";
     cout << "Press Enter to start...";
+    // cin.ignore(); // Already handled by getIntInput
     cin.get();
     return true;
 }
@@ -125,8 +154,11 @@ bool Game::initializeDebug() {
 
     cout << "\nPlayer is: " << player->getName() << "\n";
     cout << "Bot is: " << bot->getName() << "\n\n";
+    if (player) player->resetStatsForNewBattle();
+    if (bot) bot->resetStatsForNewBattle();
     cout << "Let the debug battle commence!\n";
     cout << "Press Enter to start...";
+    // cin.ignore();
     cin.get();
     return true;
 }
@@ -134,7 +166,7 @@ bool Game::initializeDebug() {
 void Game::playRound() {
     system("cls");
 
-    if (!player || !bot) { // Safety check
+    if (!player || !bot) {
         cout << "Error: Player or Bot not initialized for the round." << endl;
         return;
     }
@@ -162,72 +194,82 @@ void Game::playRound() {
 
     int botMove;
     if (debugMode) {
-        cout << "\nDEBUG MODE: Choose Bot's move:\n";
+        cout << "\nDEBUG MODE: Bot is " << bot->getName() << ". Choose Bot's move (or 4 for AI):\n";
         cout << "1. " << bot->getMoveDescription(1) << "\n";
         cout << "2. " << bot->getMoveDescription(2) << "\n";
         cout << "3. " << bot->getMoveDescription(3) << "\n";
-        botMove = getIntInput("Enter Bot's choice (1-3): ", 1, 3);
+        cout << "4. Let AI (" << (currentAIDifficulty == AIDifficulty::HARD ? "Hard" : "Easy") << ") choose for Bot\n";
+        int choice = getIntInput("Enter Bot's choice (1-4): ", 1, 4);
+        if (choice == 4) {
+            botMove = AISystem::chooseMove(*bot, *player, currentAIDifficulty);
+            cout << "AI for " << bot->getName() << " chose: " << getMoveString(botMove) << endl;
+            cout << "Press Enter to see result...";
+            cin.get();
+        }
+        else {
+            botMove = choice;
+        }
     }
     else {
-        botMove = getRandomMove();
+        cout << "Bot (" << bot->getName() << ") is thinking..." << endl;
+        botMove = AISystem::chooseMove(*bot, *player, currentAIDifficulty);
     }
 
     system("cls");
     displayHealth();
 
-    cout << "\nYou chose: " << getMoveString(playerMove) << "\n";
-    cout << "Bot chose: " << getMoveString(botMove) << "\n\n";
+    cout << "\nYou (" << player->getName() << ") chose: " << getMoveString(playerMove) << "\n";
+    cout << "Bot (" << bot->getName() << ") chose: " << getMoveString(botMove) << "\n\n";
 
     int winner = getRPSWinner(playerMove, botMove);
 
-    if (winner == 0) { // Tie
+    if (winner == 0) {
         cout << "It's a tie!\n";
-        player->checkAndApplyPassives(PassiveTrigger::ON_TIE, *player, *bot);
+        player->checkAndApplyPassives(PassiveTrigger::ON_TIE, *player, *bot, 0, false);
         if (bot->isDefeated() || player->isDefeated()) return;
-        bot->checkAndApplyPassives(PassiveTrigger::ON_TIE, *bot, *player);
+        bot->checkAndApplyPassives(PassiveTrigger::ON_TIE, *bot, *player, 0, false);
         if (player->isDefeated() || bot->isDefeated()) return;
 
     }
-    else if (winner == 1) { // Player wins round
+    else if (winner == 1) {
         int damage = player->calculateDamage(playerMove);
         cout << "You win this round! Bot (" << bot->getName() << ") takes " << damage << " damage.\n";
         int oldBotHp = bot->getCurrentHp();
         bot->takeDamage(damage);
 
-        player->checkAndApplyPassives(static_cast<PassiveTrigger>(playerMove), *player, *bot, playerMove, true); // ON_WIN_MOVE
+        player->checkAndApplyPassives(static_cast<PassiveTrigger>(playerMove), *player, *bot, playerMove, true);
         if (bot->isDefeated() || player->isDefeated()) return;
         player->checkAndApplyPassives(PassiveTrigger::AFTER_ANY_ATTACK, *player, *bot);
         if (bot->isDefeated() || player->isDefeated()) return;
 
-        bot->checkAndApplyPassives(static_cast<PassiveTrigger>(botMove + 3), *bot, *player, botMove, false); // ON_LOSE_MOVE
+        bot->checkAndApplyPassives(static_cast<PassiveTrigger>(botMove + 3), *bot, *player, botMove, false);
         if (player->isDefeated() || bot->isDefeated()) return;
         bot->checkAndApplyPassives(PassiveTrigger::AFTER_TAKING_HIT, *bot, *player);
         if (player->isDefeated() || bot->isDefeated()) return;
 
-        if (bot->getCurrentHp() != oldBotHp) { // Check HP change for ON_HP_BELOW_PERCENT
+        if (bot->getCurrentHp() != oldBotHp) {
             bot->checkAndApplyPassives(PassiveTrigger::ON_HP_BELOW_PERCENT, *bot, *player);
             if (player->isDefeated() || bot->isDefeated()) return;
         }
 
-
     }
-    else { // Bot wins round
+    else {
         int damage = bot->calculateDamage(botMove);
         cout << "Bot wins this round! You (" << player->getName() << ") take " << damage << " damage.\n";
         int oldPlayerHp = player->getCurrentHp();
         player->takeDamage(damage);
 
-        bot->checkAndApplyPassives(static_cast<PassiveTrigger>(botMove), *bot, *player, botMove, true); // ON_WIN_MOVE
+        bot->checkAndApplyPassives(static_cast<PassiveTrigger>(botMove), *bot, *player, botMove, true);
         if (player->isDefeated() || bot->isDefeated()) return;
         bot->checkAndApplyPassives(PassiveTrigger::AFTER_ANY_ATTACK, *bot, *player);
         if (player->isDefeated() || bot->isDefeated()) return;
 
-        player->checkAndApplyPassives(static_cast<PassiveTrigger>(playerMove + 3), *player, *bot, playerMove, false); // ON_LOSE_MOVE
+        player->checkAndApplyPassives(static_cast<PassiveTrigger>(playerMove + 3), *player, *bot, playerMove, false);
         if (bot->isDefeated() || player->isDefeated()) return;
         player->checkAndApplyPassives(PassiveTrigger::AFTER_TAKING_HIT, *player, *bot);
         if (bot->isDefeated() || player->isDefeated()) return;
 
-        if (player->getCurrentHp() != oldPlayerHp) { // Check HP change for ON_HP_BELOW_PERCENT
+        if (player->getCurrentHp() != oldPlayerHp) {
             player->checkAndApplyPassives(PassiveTrigger::ON_HP_BELOW_PERCENT, *player, *bot);
             if (bot->isDefeated() || player->isDefeated()) return;
         }
@@ -281,10 +323,11 @@ void Game::play() {
     }
 
     system("cls");
-    displayHealth();
+    displayHealth(); // Show final health
     announceWinner();
 
     cout << "\nBattle finished!\n";
     cout << "Press Enter to return to main menu...";
+    // cin.ignore();
     cin.get();
 }

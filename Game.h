@@ -1,31 +1,31 @@
 #ifndef GAME_H
 #define GAME_H
 
-#include "Character.h" 
-#include <string>      
-#include <vector>     
-#include <cstdlib>     
-
-
-using namespace std;
+#include "Character.h"
+#include "AISystem.h"
+#include <string>
+#include <vector>
+#include <cstdlib> 
 
 class Game {
 private:
     Character* player;
     Character* bot;
     bool debugMode;
+    AIDifficulty currentAIDifficulty;
 
-    int getRandomMove() const;
     void displayHealth() const;
     int getRPSWinner(int playerMove, int botMove) const;
-    string getMoveString(int move) const;
-    Character* selectCharacter(const string& prompt);
+    std::string getMoveString(int move) const;
+    Character* selectCharacter(const std::string& prompt);
 
 public:
     Game();
-    ~Game(); // Though default is fine with raw pointers to managed objects
+    ~Game();
 
     void setDebugMode(bool debug);
+    void setAIDifficulty(AIDifficulty difficulty);
+    AIDifficulty getAIDifficulty() const; 
     bool initialize();
     bool initializeDebug();
     void playRound();

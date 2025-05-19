@@ -1,14 +1,15 @@
 #include "CharacterManager.h"
-#include "Utils.h"          
-#include "PassiveSystem.h"  // For Passive struct and enums
-#include "Character.h"      // For Character class and derived classes like OG, Helios, etc.
+#include "Utils.h"
+#include "PassiveSystem.h"
+#include "Character.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include <algorithm>        
-#include <limits>          
+#include <algorithm>
+#include <limits>
+#include <vector> 
 
-using namespace std;
+using namespace std; 
 
 // Definition of global available characters list
 vector<unique_ptr<Character>> availableCharacters;
@@ -19,7 +20,6 @@ const string SAVE_FILE = "characters.txt";
 void loadCharacters() {
     availableCharacters.clear();
 
-    // Add built-in characters first
     availableCharacters.push_back(make_unique<OG>());
     availableCharacters.push_back(make_unique<Helios>());
     availableCharacters.push_back(make_unique<Duran>());
@@ -32,7 +32,11 @@ void loadCharacters() {
 
     if (!infile) {
         cout << "No custom character file found (" << SAVE_FILE << "). Starting with built-in characters.\n";
-        ofstream outfile(SAVE_FILE); // Optionally create an empty file
+        ofstream outfile(SAVE_FILE);
+        if (outfile) { // Add header to new file
+            outfile << "# Format: TYPE;NAME;HP;ROCK;PAPER;SCISSORS;PASSIVE1_STR;PASSIVE2_STR;..." << endl;
+            outfile << "# Passive Str: TRIGGER_ID,EFFECT_ID,VALUE,THRESHOLD" << endl;
+        }
         outfile.close();
         return;
     }
@@ -55,14 +59,14 @@ void loadCharacters() {
                 int rock = stoi(parts[3]);
                 int paper = stoi(parts[4]);
                 int scissors = stoi(parts[5]);
-                vector<Passive> passives;
+                vector<Passive> passives_data; // Renamed to avoid conflict with Character member
 
                 for (size_t i = 6; i < parts.size(); ++i) {
                     if (!parts[i].empty()) {
-                        passives.push_back(Passive::fromString(parts[i]));
+                        passives_data.push_back(Passive::fromString(parts[i]));
                     }
                 }
-                availableCharacters.push_back(make_unique<Character>(name, hp, rock, paper, scissors, passives, "CUSTOM"));
+                availableCharacters.push_back(make_unique<Character>(name, hp, rock, paper, scissors, std::move(passives_data), "CUSTOM"));
                 cout << "Loaded custom character: " << name << endl;
             }
             catch (const std::invalid_argument& e) {
@@ -75,7 +79,7 @@ void loadCharacters() {
                 cerr << "Unknown error parsing line: " << line << endl;
             }
         }
-        else if (parts[0] != "BUILTIN") { // Avoid warning for built-in if they were ever saved, doe they shouldn't be.
+        else if (parts[0] != "BUILTIN") {
             cerr << "Skipping malformed line or non-custom character entry: " << line << endl;
         }
     }
@@ -101,8 +105,8 @@ void saveCharacters() {
             outfile << characterPtr->getRockDamage() << ";";
             outfile << characterPtr->getPaperDamage() << ";";
             outfile << characterPtr->getScissorsDamage();
-            for (const auto& p : characterPtr->getPassives()) {
-                outfile << ";" << p.toString();
+            for (const auto& p_data : characterPtr->getPassives()) { // Renamed loop var
+                outfile << ";" << p_data.toString();
             }
             outfile << endl;
         }
@@ -115,6 +119,7 @@ void displayPassiveOptions() {
     cout << "\n--- Passive Triggers ---\n";
     cout << static_cast<int>(PassiveTrigger::ON_WIN_ROCK) << ": On winning with Rock\n";
     cout << static_cast<int>(PassiveTrigger::ON_WIN_PAPER) << ": On winning with Paper\n";
+    // ... (other triggers)
     cout << static_cast<int>(PassiveTrigger::ON_WIN_SCISSORS) << ": On winning with Scissors\n";
     cout << static_cast<int>(PassiveTrigger::ON_LOSE_ROCK) << ": On losing to Rock\n";
     cout << static_cast<int>(PassiveTrigger::ON_LOSE_PAPER) << ": On losing to Paper\n";
@@ -129,6 +134,7 @@ void displayPassiveOptions() {
     cout << "\n--- Passive Effects ---\n";
     cout << static_cast<int>(PassiveEffect::HEAL_SELF_FLAT) << ": Heal self (flat amount)\n";
     cout << static_cast<int>(PassiveEffect::DAMAGE_OPPONENT_FLAT) << ": Damage opponent (flat amount)\n";
+    // ... (other effects)
     cout << static_cast<int>(PassiveEffect::INCREASE_NEXT_ATTACK_FLAT) << ": Increase next attack damage (flat amount)\n";
     cout << static_cast<int>(PassiveEffect::INCREASE_ROCK_DMG_PERM) << ": Permanently increase Rock damage\n";
     cout << static_cast<int>(PassiveEffect::INCREASE_PAPER_DMG_PERM) << ": Permanently increase Paper damage\n";
@@ -139,7 +145,7 @@ void displayPassiveOptions() {
 }
 
 void createNewCharacter() {
-    system("cls");
+    system("cls"); 
     cout << "=== Create New Character ===\n\n";
 
     string name = getStringInput("Enter character name: ");
@@ -154,7 +160,8 @@ void createNewCharacter() {
     if (nameExists) {
         cout << "Error: A character with this name already exists.\n";
         cout << "Press Enter to return to the menu...";
-        cin.get(); 
+        cin.ignore(numeric_limits<streamsize>::max(), '\n'); 
+        cin.get();
         return;
     }
 
@@ -163,8 +170,8 @@ void createNewCharacter() {
     int paper = getIntInput("Enter Paper Damage (0-10): ", 0, 10);
     int scissors = getIntInput("Enter Scissors Damage (0-10): ", 0, 10);
 
-    vector<Passive> passives;
-    cout << "\n--- Add Passives (up to 3, enter 0 to skip) ---" << endl;
+    vector<Passive> passives_data; 
+    cout << "\n--- Add Passives (up to 3, enter 0 for trigger to skip) ---" << endl;
 
     for (int i = 0; i < 3; ++i) {
         cout << "\n-- Passive " << (i + 1) << " --\n";
@@ -196,8 +203,8 @@ void createNewCharacter() {
             threshold = getIntInput("Enter HP Threshold Percentage (1-99): ", 1, 99);
         }
 
-        passives.emplace_back(trigger, effect, value, threshold);
-        cout << "Added Passive: " << passives.back().getDescription() << endl;
+        passives_data.emplace_back(trigger, effect, value, threshold);
+        cout << "Added Passive: " << passives_data.back().getDescription() << endl;
 
         if (i < 2) {
             char addAnother = ' ';
@@ -210,7 +217,7 @@ void createNewCharacter() {
         }
     }
 
-    availableCharacters.push_back(make_unique<Character>(name, hp, rock, paper, scissors, passives, "CUSTOM"));
+    availableCharacters.push_back(make_unique<Character>(name, hp, rock, paper, scissors, std::move(passives_data), "CUSTOM"));
     cout << "\nCharacter '" << name << "' created successfully!\n";
     saveCharacters();
     cout << "Press Enter to return to the menu...";
@@ -230,7 +237,7 @@ void viewCharacters() {
         }
     }
     cout << "Press Enter to return to the menu...";
-    cin.get(); 
+    cin.get();
 }
 
 void deleteCharacter() {
@@ -250,7 +257,7 @@ void deleteCharacter() {
     if (customCharIndices.empty()) {
         cout << "\nNo custom characters to delete.\n";
         cout << "Press Enter to return to the menu...";
-        cin.get(); 
+        cin.get();
         return;
     }
 
@@ -267,5 +274,5 @@ void deleteCharacter() {
         saveCharacters();
     }
     cout << "Press Enter to return to the menu...";
-    cin.get(); 
+    cin.get();
 }

@@ -1,15 +1,17 @@
 #include "MainMenu.h"
-#include "CharacterManager.h" 
-#include "Utils.h"           
+#include "CharacterManager.h"
+#include "Utils.h"
+#include "GauntletGame.h" 
+#include "AISystem.h"    
 #include <iostream>
-#include <cstdlib> 
-#include <ctime>   
+#include <cstdlib>
+#include <ctime>
 
-using namespace std;
+using namespace std; 
 
 MainMenu::MainMenu() : exitGame(false) {
     srand(static_cast<unsigned int>(time(nullptr)));
-    loadCharacters(); // Load characters at the start
+    loadCharacters();
 }
 
 void MainMenu::displayMenu() {
@@ -17,10 +19,13 @@ void MainMenu::displayMenu() {
     cout << "==================================\n";
     cout << "=           PIC BATTLE           =\n";
     cout << "==================================\n\n";
-    cout << "1. Start Battle\n";
+    cout << "1. Start Battle (AI: "
+        << (game.getAIDifficulty() == AIDifficulty::HARD ? "Hard" : "Easy") << ")\n";
     cout << "2. Debug Mode Battle\n";
-    cout << "3. Character Creator\n";
-    cout << "4. Exit\n\n";
+    cout << "3. Gauntlet Mode (AI: Hard)\n";
+    cout << "4. Character Creator\n";
+    cout << "5. Set AI Difficulty\n";
+    cout << "6. Exit\n\n";
     cout << "Enter your choice: ";
 }
 
@@ -53,10 +58,10 @@ void MainMenu::runCreator() {
 void MainMenu::run() {
     while (!exitGame) {
         displayMenu();
-        int choice = getIntInput("", 1, 4);
+        int choice = getIntInput("", 1, 6);
         switch (choice) {
         case 1:
-            game.setDebugMode(false);
+            game.setDebugMode(false); // Ensure debug is off for normal start
             game.play();
             break;
         case 2:
@@ -64,12 +69,28 @@ void MainMenu::run() {
             game.play();
             break;
         case 3:
-            runCreator();
+            gauntletGame.play();
             break;
         case 4:
+            runCreator();
+            break;
+        case 5: {
+            system("cls");
+            cout << "--- Set AI Difficulty ---\n";
+            cout << "1. Easy AI\n";
+            cout << "2. Hard AI\n";
+            int diffChoice = getIntInput("Choose difficulty for regular battles: ", 1, 2);
+            game.setAIDifficulty(diffChoice == 1 ? AIDifficulty::EASY : AIDifficulty::HARD);
+            cout << "AI difficulty set to " << (game.getAIDifficulty() == AIDifficulty::HARD ? "Hard" : "Easy") << ".\n";
+            cout << "Press Enter to continue...";
+            cin.get();
+            break;
+        }
+        case 6:
             exitGame = true;
             cout << "\nSaving characters and exiting...\n";
             saveCharacters();
+            // Gauntlet unlocks are saved by GauntletGame itself.
             cout << "GAME OVER!\n";
             break;
         }

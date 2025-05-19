@@ -1,10 +1,12 @@
 #include "PassiveSystem.h"
-#include <string> 
+#include <string>
 #include <iostream> 
 
-using namespace std;
+using std::string;
+using std::to_string;
 
-string Passive::getDescription() const {
+
+std::string Passive::getDescription() const {
     string triggerDesc = "Unknown Trigger";
     switch (trigger) {
     case PassiveTrigger::NONE: triggerDesc = "No trigger"; break;
@@ -35,4 +37,36 @@ string Passive::getDescription() const {
     }
 
     return triggerDesc + ": " + effectDesc + ".";
+}
+
+std::string Passive::toString() const {
+    std::stringstream ss;
+    ss << static_cast<int>(trigger) << ","
+        << static_cast<int>(effect) << ","
+        << value << ","
+        << threshold;
+    return ss.str();
+}
+
+Passive Passive::fromString(const std::string& s) {
+    Passive p;
+    std::stringstream ss(s);
+    std::string segment;
+    int data[4] = { 0 };
+    int i = 0;
+
+    while (std::getline(ss, segment, ',') && i < 4) {
+        try {
+            data[i++] = std::stoi(segment);
+        }
+        catch (...) { /* Handle parsing error if needed */ }
+    }
+
+    if (i >= 2) { // Need at least trigger and effect
+        p.trigger = static_cast<PassiveTrigger>(data[0]);
+        p.effect = static_cast<PassiveEffect>(data[1]);
+        p.value = data[2];
+        p.threshold = data[3];
+    }
+    return p;
 }

@@ -1,23 +1,22 @@
 #ifndef CHARACTERMANAGER_H
 #define CHARACTERMANAGER_H
 
-#include "Character.h"    
+#include "Character.h"
 #include "PassiveSystem.h"
 #include <string>
-#include <memory>         
-
-using namespace std;
+#include <vector> // For std::vector
+#include <memory> // For std::unique_ptr
 
 // Global available characters list
-extern vector<unique_ptr<Character>> availableCharacters;
+extern std::vector<std::unique_ptr<Character>> availableCharacters;
 
 // Save file constant
-extern const string SAVE_FILE;
+extern const std::string SAVE_FILE;
 
 // Function declarations
 void loadCharacters();
 void saveCharacters();
-void displayPassiveOptions(); 
+void displayPassiveOptions();
 void createNewCharacter();
 void viewCharacters();
 void deleteCharacter();

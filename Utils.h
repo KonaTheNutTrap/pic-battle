@@ -2,15 +2,13 @@
 #define UTILS_H
 
 #include <string>
-#include <limits>   
-#include <iostream> 
-
-using namespace std;
+#include <limits>
+#include <iostream>
 
 // Function to get integer input safely
-int getIntInput(const string& prompt, int minVal = numeric_limits<int>::min(), int maxVal = numeric_limits<int>::max());
+int getIntInput(const std::string& prompt, int minVal = std::numeric_limits<int>::min(), int maxVal = std::numeric_limits<int>::max());
 
 // Function to get string input safely
-string getStringInput(const string& prompt);
+std::string getStringInput(const std::string& prompt);
 
 #endif // UTILS_H
