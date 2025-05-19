@@ -1,7 +1,7 @@
 #ifndef AISYSTEM_H
 #define AISYSTEM_H
 
-#include "Character.h" // Needs full definition for Character&
+#include "Character.h" 
 #include "PassiveSystem.h"
 #include <vector>
 #include <string> 
