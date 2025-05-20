@@ -16,9 +16,9 @@ MainMenu::MainMenu() : exitGame(false) {
 
 void MainMenu::displayMenu() {
     system("cls");
-    cout << "==================================\n";
-    cout << "=           PIC BATTLE           =\n";
-    cout << "==================================\n\n";
+    cout << "=================================\n";
+    cout << "=  PRECARIOUS INTUITION COMBAT  =\n";
+    cout << "=================================\n\n";
     cout << "1. Start Battle (AI: "
         << (game.getAIDifficulty() == AIDifficulty::HARD ? "Hard" : "Easy") << ")\n";
     cout << "2. Debug Mode Battle\n";
