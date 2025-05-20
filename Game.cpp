@@ -221,7 +221,6 @@ void Game::playRound() {
     else {
         cout << "Bot (" << bot->getName() << ") is thinking..." << endl;
         currentBotMove = AISystem::chooseMove(*bot, *player, currentAIDifficulty, lastBotMove, lastPlayerMove);
-        // std::this_thread::sleep_for(std::chrono::milliseconds(200)); // Optional UX delay
     }
 
     system("cls");

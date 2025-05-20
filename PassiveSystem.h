@@ -27,9 +27,9 @@ enum class PassiveEffect {
     HEAL_SELF_FLAT,
     DAMAGE_OPPONENT_FLAT,
     INCREASE_NEXT_ATTACK_FLAT,
-    INCREASE_ROCK_DMG_PERM,   // This is a key effect we're targeting
-    INCREASE_PAPER_DMG_PERM,  // This is a key effect we're targeting
-    INCREASE_SCISSORS_DMG_PERM,// This is a key effect we're targeting
+    INCREASE_ROCK_DMG_PERM,   
+    INCREASE_PAPER_DMG_PERM, 
+    INCREASE_SCISSORS_DMG_PERM,
     HEAL_SELF_PERCENT_CURRENT,
     DAMAGE_OPPONENT_PERCENT_CURRENT
 };

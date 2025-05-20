@@ -3,7 +3,6 @@
 #include <algorithm>    // For std::sort, std::shuffle, std::max_element
 #include <random>       // For std::random_device, std::mt19937, std::discrete_distribution, std::uniform_int_distribution
 #include <iostream>     // For std::cout, std::endl (debug only)
-#include <map>          // For potential future use (not currently used)
 #include <cmath>        // For std::abs, std::pow, std::exp
 #include <sstream>      // For std::stringstream (for debugReasoning)
 #include <utility>      // For std::move
@@ -356,9 +355,6 @@ int AISystem::selectMoveFromScores(const std::vector<MoveChoice>& scoredMovesInp
     }
 
     if (sum_exp_scores == 0 || probabilities.empty()) {
-        // This can happen if all scores are extremely low and result in exp(-inf) -> 0
-        // Or if scoredMoves was empty initially
-        // std::cout << "AI CHOSE (Fallback - Zero Sum or Empty): " << moveToString(scoredMoves.empty() ? (rand()%3+1) : scoredMoves[0].move) << std::endl;
         std::random_device rd;
         std::mt19937 gen(rd());
         std::uniform_int_distribution<> distrib_move(1, 3);
@@ -374,7 +370,6 @@ int AISystem::selectMoveFromScores(const std::vector<MoveChoice>& scoredMovesInp
     std::discrete_distribution<> dist(probabilities.begin(), probabilities.end());
 
     int chosenIndex = dist(gen);
-    // std::cout << "AI CHOSE (Probabilistic): " << moveToString(scoredMoves[chosenIndex].move) << " with prob " << probabilities[chosenIndex] << std::endl;
     return scoredMoves[chosenIndex].move;
 }
 
@@ -384,7 +379,6 @@ int AISystem::getWinningMoveAgainst(int opponentMove) {
     if (opponentMove == 1) return 2; // Paper beats Rock
     if (opponentMove == 2) return 3; // Scissors beats Paper
     if (opponentMove == 3) return 1; // Rock beats Scissors
-    // Should not be called with opponentMove == 0, but handle defensively
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> distrib_move(1, 3);
