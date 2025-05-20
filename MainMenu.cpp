@@ -1,13 +1,13 @@
 #include "MainMenu.h"
-#include "CharacterManager.h"
-#include "Utils.h"
-#include "GauntletGame.h" 
-#include "AISystem.h"    
+#include "CharacterManager.h" 
+#include "Utils.h"           
+#include "GauntletGame.h"
+#include "AISystem.h"     
 #include <iostream>
-#include <cstdlib>
-#include <ctime>
+#include <cstdlib> 
+#include <ctime>   
 
-using namespace std; 
+using namespace std;
 
 MainMenu::MainMenu() : exitGame(false) {
     srand(static_cast<unsigned int>(time(nullptr)));
@@ -36,8 +36,9 @@ void MainMenu::displayCreatorMenu() {
     cout << "==================================\n\n";
     cout << "1. Create New Character\n";
     cout << "2. View All Characters\n";
-    cout << "3. Delete Custom Character\n";
-    cout << "4. Back to Main Menu\n\n";
+    cout << "3. Edit Custom Character\n";
+    cout << "4. Delete Custom Character\n";
+    cout << "5. Back to Main Menu\n\n";
     cout << "Enter your choice: ";
 }
 
@@ -45,12 +46,13 @@ void MainMenu::runCreator() {
     bool back = false;
     while (!back) {
         displayCreatorMenu();
-        int choice = getIntInput("", 1, 4);
+        int choice = getIntInput("", 1, 5);
         switch (choice) {
         case 1: createNewCharacter(); break;
         case 2: viewCharacters(); break;
-        case 3: deleteCharacter(); break;
-        case 4: back = true; break;
+        case 3: editCharacter(); break;
+        case 4: deleteCharacter(); break;
+        case 5: back = true; break;
         }
     }
 }
@@ -61,7 +63,7 @@ void MainMenu::run() {
         int choice = getIntInput("", 1, 6);
         switch (choice) {
         case 1:
-            game.setDebugMode(false); // Ensure debug is off for normal start
+            game.setDebugMode(false);
             game.play();
             break;
         case 2:
@@ -90,7 +92,6 @@ void MainMenu::run() {
             exitGame = true;
             cout << "\nSaving characters and exiting...\n";
             saveCharacters();
-            // Gauntlet unlocks are saved by GauntletGame itself.
             cout << "GAME OVER!\n";
             break;
         }
